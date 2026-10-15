@@ -8,8 +8,13 @@
 
 #define kExcAccMaxWait 5
 
-void DeviceConnected (void *refCon, io_iterator_t iterator);
+int DeviceConnected (io_iterator_t iterator, int *failed);
 
+// Exit codes:
+//   0  at least one device matched and every matched device was re-enumerated
+//   1  usage, invalid arguments, or setup error
+//   2  no device matched
+//   3  at least one matched device failed
 int main (int argc, char const *argv[])
 {
   if (argc < 3) {
@@ -53,9 +58,15 @@ int main (int argc, char const *argv[])
     fprintf(stderr, "IOServiceGetMatchingServices\n");
     exit(1);
   }
-  DeviceConnected(NULL, iter);
+  int failed = 0;
+  int found = DeviceConnected(iter, &failed);
   IOObjectRelease(iter);
 
+  if (failed) return 3;
+  if (!found) {
+    fprintf(stderr, "No matching device found\n");
+    return 2;
+  }
   return 0;
 }
 
@@ -72,7 +83,7 @@ IOReturn ConfigureDevice (IOUSBDeviceInterface245 **dev) {
   return kIOReturnSuccess;
 }
 
-void DeviceConnected (void *refCon, io_iterator_t iterator) {
+int DeviceConnected (io_iterator_t iterator, int *failed) {
   kern_return_t kerr;
   io_service_t device;
   IOCFPlugInInterface **iodev;
@@ -80,6 +91,7 @@ void DeviceConnected (void *refCon, io_iterator_t iterator) {
   UInt16 vendor, product, version;
   HRESULT result;
   int u;
+  int found = 0;
 
   while ((device = IOIteratorNext(iterator))) {
     // get device plugin
@@ -87,6 +99,7 @@ void DeviceConnected (void *refCon, io_iterator_t iterator) {
     IOObjectRelease(device);
     if (kerr != kIOReturnSuccess) {
       fprintf(stderr, "could not create plug-in interface: %08x\n", kerr);
+      (*failed)++;
       continue;
     }
 
@@ -95,6 +108,7 @@ void DeviceConnected (void *refCon, io_iterator_t iterator) {
     IODestroyPlugInInterface(iodev);
     if (result || !dev) {
       fprintf(stderr, "could not get device interface: %08x\n", (int)result);
+      (*failed)++;
       continue;
     }
 
@@ -103,6 +117,7 @@ void DeviceConnected (void *refCon, io_iterator_t iterator) {
     (*dev)->GetDeviceProduct(dev, &product);
     (*dev)->GetDeviceReleaseNumber(dev, &version);
     fprintf(stdout, "Found device vendor=0x%04X, product=0x%04X, version=0x%04X\n", vendor, product, version);
+    found++;
 
     // open device
     u = 0;
@@ -117,6 +132,7 @@ void DeviceConnected (void *refCon, io_iterator_t iterator) {
 
     if (kerr != kIOReturnSuccess) {
       fprintf(stderr, "could not open device: %08x\n", kerr);
+      (*failed)++;
       (void) (*dev)->Release(dev);
       continue;
     }
@@ -124,6 +140,7 @@ void DeviceConnected (void *refCon, io_iterator_t iterator) {
     // configure device
     if (ConfigureDevice(dev) != kIOReturnSuccess) {
       fprintf(stderr, "could not configure device\n");
+      (*failed)++;
       (*dev)->USBDeviceClose(dev);
       (*dev)->Release(dev);
       continue;
@@ -133,10 +150,13 @@ void DeviceConnected (void *refCon, io_iterator_t iterator) {
     kerr = (*dev)->USBDeviceReEnumerate(dev, 0);
     if (kerr != kIOReturnSuccess) {
       fprintf(stdout, "USBDeviceReEnumerate: error %d\n", kerr);
+      (*failed)++;
     }
 
     // close device
     (*dev)->USBDeviceClose(dev);
     (*dev)->Release(dev);
   }
+
+  return found;
 }
