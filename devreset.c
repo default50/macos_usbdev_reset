@@ -8,8 +8,6 @@
 
 #define kExcAccMaxWait 5
 
-static mach_port_t gMachPort;
-
 void DeviceConnected (void *refCon, io_iterator_t iterator);
 
 int main (int argc, char const *argv[])
@@ -31,28 +29,32 @@ int main (int argc, char const *argv[])
   printf("Looking for productID=0x%04x vendorID=0x%04x\n", productID, vendorID);
 
   kern_return_t kerr;
-  kerr = IOMasterPort(MACH_PORT_NULL, &gMachPort);
-  if (kerr || !gMachPort) return 1;
 
   CFMutableDictionaryRef dict = IOServiceMatching(kIOUSBDeviceClassName);
   if (!dict) {
     fprintf(stderr, "could not create matching dictionary for device vendor=0x%04X,product=0x%04X\n", vendorID, productID);
     exit(1);
   }
-  CFDictionarySetValue(dict, CFSTR(kUSBVendorID), CFNumberCreate(kCFAllocatorDefault, kCFNumberSInt32Type, &vendorID));
-  CFDictionarySetValue(dict, CFSTR(kUSBProductID), CFNumberCreate(kCFAllocatorDefault, kCFNumberSInt32Type, &productID));
+  // the dictionary retains its values, so release our references
+  CFNumberRef vendorNum = CFNumberCreate(kCFAllocatorDefault, kCFNumberSInt32Type, &vendorID);
+  CFNumberRef productNum = CFNumberCreate(kCFAllocatorDefault, kCFNumberSInt32Type, &productID);
+  CFDictionarySetValue(dict, CFSTR(kUSBVendorID), vendorNum);
+  CFDictionarySetValue(dict, CFSTR(kUSBProductID), productNum);
+  CFRelease(vendorNum);
+  CFRelease(productNum);
   // IOServiceGetMatchingServices consumes dict and returns a snapshot of the
   // devices matching now, so devices that come back after being re-enumerated
   // are not picked up (and reset) again.
+  // MACH_PORT_NULL selects the default main port. kIOMainPortDefault is
+  // not used because it needs macOS 12 and the x86_64 build targets 10.12.
   io_iterator_t iter;
-  kerr = IOServiceGetMatchingServices(gMachPort, dict, &iter);
+  kerr = IOServiceGetMatchingServices(MACH_PORT_NULL, dict, &iter);
   if (kerr != kIOReturnSuccess) {
     fprintf(stderr, "IOServiceGetMatchingServices\n");
     exit(1);
   }
   DeviceConnected(NULL, iter);
   IOObjectRelease(iter);
-  mach_port_deallocate(mach_task_self(), gMachPort);
 
   return 0;
 }
