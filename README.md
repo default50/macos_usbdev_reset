@@ -21,9 +21,8 @@ Requires the Xcode Command Line Tools.
 make
 ```
 
-This builds `devreset_x86` (x86_64, macOS 10.12+) and `devreset_arm`
-(arm64, macOS 11+) and combines them with `lipo` into a universal
-`devreset`. `make clean` removes all three.
+This builds a single universal `devreset` (x86_64 for macOS 10.12+,
+arm64 for macOS 11+). `make clean` removes it.
 
 ## Usage
 

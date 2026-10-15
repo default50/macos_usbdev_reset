@@ -1,15 +1,12 @@
 TARGET = devreset
 
-all: universal
+all: $(TARGET)
 
-$(TARGET)_x86: $(TARGET).c
-	gcc $(TARGET).c -framework IOKit -framework CoreFoundation -o $(TARGET)_x86 -target x86_64-apple-macos10.12
-
-$(TARGET)_arm: $(TARGET).c
-	gcc $(TARGET).c -framework IOKit -framework CoreFoundation -o $(TARGET)_arm -target arm64-apple-macos11
-
-universal: $(TARGET)_x86 $(TARGET)_arm
-	lipo -create -output $(TARGET) $(TARGET)_x86 $(TARGET)_arm
+# Universal binary (x86_64 + arm64) in one step; clang merges the slices.
+# arm64 has no macOS before 11, so its slice is raised to 11 automatically.
+$(TARGET): $(TARGET).c
+	gcc $(TARGET).c -framework IOKit -framework CoreFoundation -o $(TARGET) \
+		-arch x86_64 -arch arm64 -mmacosx-version-min=10.12
 
 clean:
-	$(RM) $(TARGET) $(TARGET)_x86 $(TARGET)_arm
+	$(RM) $(TARGET)
