@@ -1,0 +1,60 @@
+#!/usr/bin/env bash
+#
+# pre-commit hook: run the unit tests, lint Markdown with markdownlint-cli2
+# and lint this hook with shellcheck before committing.
+#
+# Checks the working tree and *all* tracked files of each kind on every
+# commit, not just the staged ones. A failure blocks the commit.
+#
+# Notes:
+#   - The unit tests use a fake usb_ops, so no USB device is touched.
+#   - markdownlint-cli2 reads .markdownlint.jsonc from the repo root (it
+#     resolves config by directory), so the hook runs from the repo root.
+#
+# Enable this hook (once per clone):
+#   git config core.hooksPath .githooks
+#
+set -Eeuo pipefail
+
+# Resolve to the repo root so the hook works regardless of the current dir.
+repo_root=$(git rev-parse --show-toplevel)
+cd "${repo_root}"
+
+for tool in make markdownlint-cli2 shellcheck; do
+    if ! command -v "${tool}" >/dev/null 2>&1; then
+        echo "pre-commit: ${tool} not found on PATH." >&2
+        echo "  Install it with 'brew install ${tool}' or skip with 'git commit --no-verify'." >&2
+        exit 1
+    fi
+done
+
+# Run check $1 (a label) as the remaining arguments; abort the commit on failure.
+run_check() {
+    local label=$1
+    shift
+    echo "pre-commit: running ${label}..."
+    if ! "$@"; then
+        echo "" >&2
+        echo "pre-commit: ${label} failed (see above). Commit aborted." >&2
+        echo "  Fix the findings, or bypass with 'git commit --no-verify' if intentional." >&2
+        exit 1
+    fi
+    echo "pre-commit: ${label} passed."
+}
+
+run_check "unit tests" make -s test
+
+# Empty arrays are expanded with ${a[@]+...} because macOS bash 3.2 treats
+# them as unset under set -u. Index view, so a brand-new file being added
+# in this commit is included.
+docs=()
+while IFS= read -r f; do
+    docs+=("${f}")
+done < <(git ls-files -- '*.md')
+if [[ ${#docs[@]} -gt 0 ]]; then
+    run_check markdownlint-cli2 markdownlint-cli2 "${docs[@]}"
+fi
+
+run_check shellcheck shellcheck .githooks/pre-commit
+
+exit 0

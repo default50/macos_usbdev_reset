@@ -17,7 +17,7 @@ universal build.
 
 Requires the Xcode Command Line Tools.
 
-```
+```sh
 make
 ```
 
@@ -26,7 +26,7 @@ arm64 for macOS 11+). `make clean` removes it and the test binary.
 
 ## Testing
 
-```
+```sh
 make test
 ```
 
@@ -39,13 +39,26 @@ exit codes, once-per-device reset of devices that share a VID/PID, and
 The tests use [greatest](https://github.com/silentbicycle/greatest)
 v1.5.0 (ISC), vendored unmodified in `tests/greatest.h`.
 
-To run the tests before every commit, enable the hook with
-`git config core.hooksPath hooks`, or copy `hooks/pre-commit` into
-`.git/hooks/`. `git commit --no-verify` skips it once.
+## Local checks (pre-commit hook)
+
+`.githooks/pre-commit` runs `make test`, lints all tracked Markdown with
+[markdownlint-cli2](https://github.com/DavidAnson/markdownlint-cli2)
+(config in `.markdownlint.jsonc`) and lints the hook itself with
+[shellcheck](https://www.shellcheck.net/). A failure blocks the commit.
+Enable it once per clone:
+
+```sh
+git config core.hooksPath .githooks
+```
+
+Requires `markdownlint-cli2` and `shellcheck` on your `PATH`
+(`brew install markdownlint-cli2 shellcheck`). The hook checks the
+working tree, not just the staged changes. `git commit --no-verify`
+skips it once.
 
 ## Usage
 
-```
+```text
 devreset [-n] [-l locationID] [-r release] productID vendorID
   -n             list matching devices, do not reset them
   -l locationID  only the device at this locationID
@@ -55,7 +68,7 @@ devreset [-n] [-l locationID] [-r release] productID vendorID
 IDs can be hex (`0x...`) or decimal. Options go before the IDs. Every
 matching device is reset once.
 
-```
+```sh
 ./devreset -n 0x0407 0x1050               # list matches, reset nothing
 ./devreset 0x0407 0x1050                  # reset every match
 ./devreset -l 0x01100000 0x0407 0x1050    # reset only the one at that location
@@ -63,7 +76,7 @@ matching device is reset once.
 
 `-n` prints one line per match:
 
-```
+```text
 Looking for productID=0x0407 vendorID=0x1050
 Found device vendor=0x1050, product=0x0407, version=0x0543, locationID=0x01100000
 Found device vendor=0x1050, product=0x0407, version=0x0574, locationID=0x00100000
@@ -85,7 +98,7 @@ identical devices that run different firmware.
 ## Exit codes
 
 | Code | Meaning |
-|---|---|
+| --- | --- |
 | 0 | At least one device matched and every matched device was re-enumerated (with `-n`: at least one device matched) |
 | 1 | Usage, invalid arguments, or setup error |
 | 2 | No device matched |

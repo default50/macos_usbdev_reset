@@ -1,0 +1,13 @@
+{
+  // All rules stay enabled by default; we only relax the following.
+  //
+  // MD013 (line-length): disabled. An 80-character cap is arbitrary for prose,
+  // and the VS Code markdownlint extension already disables it by default.
+  // This keeps the CLI (markdownlint-cli2) consistent with the editor.
+  "MD013": false,
+  // MD024 (no-duplicate-heading): only flag duplicate headings that are siblings.
+  "MD024": { "siblings_only": true },
+  // MD052 (reference-links-images): also check *shortcut* references, so a
+  // missing link definition is caught instead of rendering as literal brackets.
+  "MD052": { "shortcut_syntax": true }
+}
