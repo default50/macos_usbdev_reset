@@ -1,4 +1,17 @@
+// devreset: re-enumerate (simulate unplug/replug of) matching USB devices
+//
+// Based on reenumerate.c by Jesús A. Álvarez (GitHub: zydeco):
+//   https://gist.github.com/zydeco/4ba02afa99d3c234c2dfa975fec0b102
+// The original gist does not state a license. License confirmation was
+// requested from the author here:
+//   https://gist.github.com/zydeco/4ba02afa99d3c234c2dfa975fec0b102?permalink_comment_id=6429082#gistcomment-6429082
+//
 // Copyright (C) 2020 Jesús A. Álvarez
+// Copyright (C) 2020 David Helkowski
+// Copyright (C) 2026 Sebastian Cruz
+//
+// Changes made in this repository are licensed under the MIT License;
+// see LICENSE.
 #include <stdio.h>
 #include <CoreFoundation/CoreFoundation.h>
 #include <IOKit/IOKitLib.h>
