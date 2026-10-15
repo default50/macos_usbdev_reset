@@ -160,7 +160,7 @@ int DeviceConnected (io_iterator_t iterator, int *failed) {
     (*dev)->GetDeviceVendor(dev, &vendor);
     (*dev)->GetDeviceProduct(dev, &product);
     (*dev)->GetDeviceReleaseNumber(dev, &version);
-    UInt32 location;
+    UInt32 location = 0;
     (*dev)->GetLocationID(dev, &location);
 
     // skip devices that don't pass the filters, without opening them

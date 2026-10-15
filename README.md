@@ -68,7 +68,7 @@ identical devices that run different firmware.
 
 | Code | Meaning |
 |---|---|
-| 0 | At least one device matched and every matched device was re-enumerated |
+| 0 | At least one device matched and every matched device was re-enumerated (with `-n`: at least one device matched) |
 | 1 | Usage, invalid arguments, or setup error |
 | 2 | No device matched |
 | 3 | At least one matched device failed |
