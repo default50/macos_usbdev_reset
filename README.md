@@ -22,7 +22,26 @@ make
 ```
 
 This builds a single universal `devreset` (x86_64 for macOS 10.12+,
-arm64 for macOS 11+). `make clean` removes it.
+arm64 for macOS 11+). `make clean` removes it and the test binary.
+
+## Testing
+
+```
+make test
+```
+
+This builds `tests/test_devreset` for your native architecture and runs
+it. No frameworks are linked: a fake (`tests/fake_usb_ops.c`) stands in
+for IOKit, so no USB device is touched. The tests cover usage errors,
+exit codes, once-per-device reset of devices that share a VID/PID, and
+`-n`/`-l`/`-r` selection. A real reset still needs hardware.
+
+The tests use [greatest](https://github.com/silentbicycle/greatest)
+v1.5.0 (ISC), vendored unmodified in `tests/greatest.h`.
+
+To run the tests before every commit, enable the hook with
+`git config core.hooksPath hooks`, or copy `hooks/pre-commit` into
+`.git/hooks/`. `git commit --no-verify` skips it once.
 
 ## Usage
 

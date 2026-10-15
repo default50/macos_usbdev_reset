@@ -1,0 +1,5 @@
+#!/bin/sh
+# Runs the unit tests before each commit; a failure blocks the commit.
+# Enable: git config core.hooksPath hooks  (or copy into .git/hooks/)
+# Skip once: git commit --no-verify
+exec make -s test
