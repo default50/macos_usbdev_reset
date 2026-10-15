@@ -5,26 +5,70 @@
 #include <IOKit/IOCFPlugIn.h>
 #include <IOKit/usb/IOUSBLib.h>
 #include <mach/mach.h>
+#include <unistd.h>
 
 #define kExcAccMaxWait 5
 
+// device filters set from the command line
+static int gListOnly, gHaveLocation, gHaveRelease;
+static UInt32 gLocationID;
+static UInt16 gRelease;
+
 int DeviceConnected (io_iterator_t iterator, int *failed);
+
+static void Usage (const char *prog) {
+  fprintf(stderr,
+    "usage: %s [-n] [-l locationID] [-r release] productID vendorID\n"
+    "  -n             list matching devices, do not reset them\n"
+    "  -l locationID  only the device at this locationID\n"
+    "  -r release     only devices with this release (bcdDevice)\n", prog);
+  exit(1);
+}
 
 // Exit codes:
 //   0  at least one device matched and every matched device was re-enumerated
 //   1  usage, invalid arguments, or setup error
 //   2  no device matched
 //   3  at least one matched device failed
-int main (int argc, char const *argv[])
+int main (int argc, char *argv[])
 {
-  if (argc < 3) {
-    fprintf(stderr, "usage: %s productID vendorID\n", argv[0]);
-    exit(1);
+  int ch;
+  unsigned long v;
+  char *end;
+
+  while ((ch = getopt(argc, argv, "nl:r:")) != -1) {
+    switch (ch) {
+      case 'n':
+        gListOnly = 1;
+        break;
+      case 'l':
+        v = strtoul(optarg, &end, 0);
+        if (end == optarg || *end || v > 0xffffffff) {
+          fprintf(stderr, "Invalid locationID\n");
+          exit(1);
+        }
+        gLocationID = (UInt32)v;
+        gHaveLocation = 1;
+        break;
+      case 'r':
+        v = strtoul(optarg, &end, 0);
+        if (end == optarg || *end || v > 0xffff) {
+          fprintf(stderr, "Invalid release\n");
+          exit(1);
+        }
+        gRelease = (UInt16)v;
+        gHaveRelease = 1;
+        break;
+      default:
+        Usage(argv[0]);
+    }
   }
 
+  if (argc - optind < 2) Usage(argv[0]);
+
   SInt32 productID, vendorID;
-  productID = strtol(argv[1], NULL, 0);
-  vendorID = strtol(argv[2], NULL, 0);
+  productID = strtol(argv[optind], NULL, 0);
+  vendorID = strtol(argv[optind+1], NULL, 0);
 
   if (productID <= 0 || productID > 0xffff || vendorID <= 0 || vendorID > 0xffff) {
     fprintf(stderr, "Invalid productID or vendorID\n");
@@ -116,8 +160,22 @@ int DeviceConnected (io_iterator_t iterator, int *failed) {
     (*dev)->GetDeviceVendor(dev, &vendor);
     (*dev)->GetDeviceProduct(dev, &product);
     (*dev)->GetDeviceReleaseNumber(dev, &version);
-    fprintf(stdout, "Found device vendor=0x%04X, product=0x%04X, version=0x%04X\n", vendor, product, version);
+    UInt32 location;
+    (*dev)->GetLocationID(dev, &location);
+
+    // skip devices that don't pass the filters, without opening them
+    if ((gHaveLocation && location != gLocationID) || (gHaveRelease && version != gRelease)) {
+      (*dev)->Release(dev);
+      continue;
+    }
+
+    fprintf(stdout, "Found device vendor=0x%04X, product=0x%04X, version=0x%04X, locationID=0x%08X\n", vendor, product, version, (unsigned int)location);
     found++;
+
+    if (gListOnly) {
+      (*dev)->Release(dev);
+      continue;
+    }
 
     // open device
     u = 0;
