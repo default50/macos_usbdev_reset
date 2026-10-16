@@ -1,7 +1,8 @@
 #!/usr/bin/env bash
 #
 # pre-commit hook: run the unit tests, lint Markdown with markdownlint-cli2
-# and lint this hook with shellcheck before committing.
+# and lint the shell scripts (this hook, yubireset) with shellcheck before
+# committing.
 #
 # Checks the working tree and *all* tracked files of each kind on every
 # commit, not just the staged ones. A failure blocks the commit.
@@ -55,6 +56,6 @@ if [[ ${#docs[@]} -gt 0 ]]; then
     run_check markdownlint-cli2 markdownlint-cli2 "${docs[@]}"
 fi
 
-run_check shellcheck shellcheck .githooks/pre-commit
+run_check shellcheck shellcheck .githooks/pre-commit yubireset
 
 exit 0

@@ -43,8 +43,8 @@ v1.5.0 (ISC), vendored unmodified in `tests/greatest.h`.
 
 `.githooks/pre-commit` runs `make test`, lints all tracked Markdown with
 [markdownlint-cli2](https://github.com/DavidAnson/markdownlint-cli2)
-(config in `.markdownlint.jsonc`) and lints the hook itself with
-[shellcheck](https://www.shellcheck.net/). A failure blocks the commit.
+(config in `.markdownlint.jsonc`) and lints the hook and `yubireset`
+with [shellcheck](https://www.shellcheck.net/). A failure blocks the commit.
 Enable it once per clone:
 
 ```sh
@@ -82,6 +82,31 @@ Found device vendor=0x1050, product=0x0407, version=0x0543, locationID=0x0110000
 Found device vendor=0x1050, product=0x0407, version=0x0574, locationID=0x00100000
 ```
 
+## yubireset
+
+`yubireset` is a small bash wrapper around devreset for YubiKeys. The
+vendor ID is always Yubico's (`0x1050`) and the product ID defaults to
+`0x0407` (YubiKey 5 OTP+FIDO+CCID).
+
+```text
+yubireset [-p productID] [-n] [-l locationID] [-r release]
+  -p productID   YubiKey product ID (default 0x0407)
+  -n             list matching YubiKeys, do not reset them
+  -l locationID  only the YubiKey at this locationID
+  -r release     only YubiKeys with this release (bcdDevice)
+```
+
+```sh
+./yubireset -n                  # list connected YubiKeys
+./yubireset                     # reset every YubiKey 5 OTP+FIDO+CCID
+./yubireset -l 0x01100000       # reset only the one at that location
+./yubireset -p 0x0402           # another product ID
+```
+
+It uses the `devreset` next to it (symlinks are followed, so you can
+link it into `~/bin`), or else one on your `PATH`. Exit codes are
+devreset's, with a hint printed for 2 and 3.
+
 ## Finding IDs and locationIDs
 
 - `devreset -n productID vendorID` shows version and locationID in hex.
@@ -106,10 +131,12 @@ identical devices that run different firmware.
 
 ## Caveats
 
-- If another process holds the device open exclusively (smartcard
-  daemons such as `pcscd` or `scdaemon`, vendor apps), devreset waits
-  about 5 seconds (`waiting for access`) and then fails with exit 3. Quit
-  or kill that process first.
+- If another process holds the whole device open exclusively (some vendor
+  apps do), devreset waits about 5 seconds (`waiting for access`) and
+  then fails with exit 3 (`could not open device: e00002c5`). Quit that
+  process first. Smartcard services (`scdaemon`, macOS CryptoTokenKit)
+  only claim the CCID interface and do not block a reset; tested on
+  macOS 26 with `scdaemon` running.
 - Root is usually not required. All testing ran as a normal user.
 - The device disappears briefly and comes back with a new IOKit registry
   entry.

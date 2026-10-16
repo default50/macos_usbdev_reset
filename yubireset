@@ -1,0 +1,96 @@
+#!/usr/bin/env bash
+#
+# yubireset: re-enumerate connected YubiKeys without unplugging them.
+#
+# Wraps devreset, which calls USBDeviceReEnumerate() through IOKit so macOS
+# tears down and rebuilds the USB connection in software. The vendor ID is
+# always Yubico's (0x1050); the product ID defaults to 0x0407 (YubiKey 5
+# OTP+FIDO+CCID) and can be changed with -p.
+#
+# Exit status is devreset's: 0 ok, 1 usage or setup error, 2 no YubiKey
+# matched, 3 at least one reset failed.
+#
+set -Eeuo pipefail
+
+VENDOR_ID=0x1050
+PRODUCT_ID=0x0407
+
+usage() {
+    cat <<EOF
+usage: yubireset [-p productID] [-n] [-l locationID] [-r release]
+  -p productID   YubiKey product ID (default ${PRODUCT_ID})
+  -n             list matching YubiKeys, do not reset them
+  -l locationID  only the YubiKey at this locationID
+  -r release     only YubiKeys with this release (bcdDevice)
+EOF
+}
+
+# Directory of this script, following symlinks (so a link in ~/bin finds
+# the devreset next to the real file). Portable to macOS bash 3.2, which
+# has no readlink -f before macOS 12.3.
+script_dir() {
+    local src=${BASH_SOURCE[0]} dir
+    while [[ -L "${src}" ]]; do
+        dir=$(cd -P "$(dirname "${src}")" && pwd)
+        src=$(readlink "${src}")
+        [[ "${src}" == /* ]] || src="${dir}/${src}"
+    done
+    cd -P "$(dirname "${src}")" && pwd
+}
+
+# Prefer the devreset next to this script, then one on PATH.
+find_devreset() {
+    local dir
+    dir=$(script_dir)
+    if [[ -x "${dir}/devreset" ]]; then
+        echo "${dir}/devreset"
+    elif command -v devreset >/dev/null 2>&1; then
+        command -v devreset
+    else
+        echo "yubireset: devreset not found next to this script or on PATH." >&2
+        echo "  Build it first: cd ${dir} && make" >&2
+        return 1
+    fi
+}
+
+devreset_opts=()
+list_only=0
+while getopts ":p:nl:r:h" opt; do
+    case ${opt} in
+        p) PRODUCT_ID=${OPTARG} ;;
+        n) devreset_opts+=(-n); list_only=1 ;;
+        l) devreset_opts+=(-l "${OPTARG}") ;;
+        r) devreset_opts+=(-r "${OPTARG}") ;;
+        h) usage; exit 0 ;;
+        :) echo "yubireset: -${OPTARG} needs a value" >&2; usage >&2; exit 1 ;;
+        *) echo "yubireset: unknown option -${OPTARG}" >&2; usage >&2; exit 1 ;;
+    esac
+done
+shift $((OPTIND - 1))
+if [[ $# -ne 0 ]]; then
+    echo "yubireset: unexpected argument: $1" >&2
+    usage >&2
+    exit 1
+fi
+
+devreset=$(find_devreset) || exit 1
+
+# Empty arrays are expanded with ${a[@]+...} because macOS bash 3.2 treats
+# them as unset under set -u.
+rc=0
+"${devreset}" ${devreset_opts[@]+"${devreset_opts[@]}"} "${PRODUCT_ID}" "${VENDOR_ID}" || rc=$?
+
+case ${rc} in
+    0)
+        if [[ ${list_only} -eq 0 ]]; then
+            echo "yubireset: done. The YubiKey should reappear in a few seconds."
+        fi
+        ;;
+    2)
+        echo "yubireset: no matching YubiKey found. Is it plugged in? Check the product ID with 'system_profiler SPUSBHostDataType'." >&2
+        ;;
+    3)
+        echo "yubireset: a reset failed (see above). 'could not open device' means another app holds the YubiKey open exclusively; quit it and retry." >&2
+        ;;
+esac
+exit "${rc}"
